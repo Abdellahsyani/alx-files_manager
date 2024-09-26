@@ -17,7 +17,7 @@ Of course, this kind of service already exists in the real life - it’s a learn
 Enjoy!
 
 ## Resources
-* [x]Read or watch:
+* [x] Read or watch:
 
 * [Node JS getting started](https://nodejs.org/en/learn/getting-started/introduction-to-nodejs)
 * [Process API doc](https://node.readthedocs.io/en/latest/api/process/)

@@ -1,4 +1,5 @@
 # 0x04. Files manager
+* [x] Back-end [x] JavaScript [x] ES6 [x] NoSQL [x] MongoDB [x] Redis [x] NodeJS [x] ExpressJS [x] Kue
 
 This project is a summary of this back-end trimester: authentication, NodeJS, MongoDB, Redis, pagination and background processing.
 

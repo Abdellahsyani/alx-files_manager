@@ -8,13 +8,11 @@ export default class AppController {
       db: dbClient.isAlive(),
     });
   }
-
   static getStats(req, res) {
-    const stats = {
-      users: 12,
-      filess: 1231,
-    };
-    res.status(200).send(stats);
+    Promise.all([dbClient.nbUsers(), dbClient.nbFiles()])
+      .then(([usersCount, filesCount]) => {
+        res.status(200).json({ users: usersCount, files: filesCount });
+      });
   }
 }
 

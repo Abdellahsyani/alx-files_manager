@@ -32,6 +32,13 @@ class DBClient {
     );
   }
 
+  async userCollection() {
+    if (!this.isAlive()) {
+      throw new Error('Not connected to the database');
+    }
+    return this.client.db().collection('users');
+  }
+
   async nbUsers() {
     if (!this.isAlive()) {
       throw new Error('Not connected to the database');

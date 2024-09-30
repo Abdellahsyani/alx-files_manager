@@ -8,6 +8,7 @@ export default class AppController {
       db: dbClient.isAlive(),
     });
   }
+
   static getStats(req, res) {
     Promise.all([dbClient.nbUsers(), dbClient.nbFiles()])
       .then(([usersCount, filesCount]) => {

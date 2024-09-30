@@ -24,10 +24,13 @@ class DBClient {
   }
 
   isAlive() {
-  const isConnected = this.connected && this.client && this.client.topology && this.client.topology.isConnected();
-  console.log('DB is alive:', isConnected);
-  return isConnected;
-}
+    return (
+      this.connected
+      && this.client
+      && this.client.topology
+      && this.client.topology.isConnected()
+    );
+  }
 
   async nbUsers() {
     if (!this.isAlive()) {

@@ -18,13 +18,18 @@ class DBClient {
       this.connected = true;
       console.log('Connected to MongoDB');
     } catch (error) {
-      console.error('Failed to connect to MongobDB:', error);
+      console.error('Failed to connect to MongoDB:', error);
       this.client = null;
     }
   }
 
   isAlive() {
-    return this.client && this.client.topology && this.client.topology.isConnected();
+    return (
+      this.connected
+      && this.client
+      && this.client.topology
+      && this.client.topology.isConnected()
+    );
   }
 
   async nbUsers() {

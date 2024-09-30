@@ -1,13 +1,17 @@
-import shal from 'shal';
+import { createHash } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import redisClient from '../utils/redis';
+import { redisClient } from '../utils/redis';
+
+const users = [
+  { email: 'test@example.com', passwordHash: createHash('sha1').update('password123').digest('hex'), _id: '1' },
+];
 
 export default class AuthController {
   static async getConnect(req, res) {
-    const authHeader = req.headers['authorization'];
+    const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Basic ')) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const base64Info = authHeader.split(' ')[1];
@@ -15,17 +19,18 @@ export default class AuthController {
     const [email, password] = info.split(':');
 
     try {
-        const user = await User.findUser({ email });
-        if (!user || shal(password) !== user.passwordHash) {
-            return res.status(401).json({ error: 'Unauthorized' }); 
-        }
+      const user = users.find((u) => u.email === email);
+      const hashedPassword = createHash('shal').update(password).digest('hex');
+      if (!user || hashedPassword !== user.passwordHash) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
 
-        const token = uuidv4();
-        await redisClient.set(`auth_${token}`, user._id.toString(), 'EX',24 * 60 * 60);
+      const token = uuidv4();
+      await redisClient.set(`auth_${token}`, user._id.toString(), 'EX', 24 * 60 * 60);
 
-        res.status(200).json({ token });
+      return res.status(200).json({ token });
     } catch (error) {
-        res.status(500).json({ error: 'Internal Server Error'});
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
 
@@ -33,11 +38,11 @@ export default class AuthController {
     const token = req.headers['x-token'];
 
     if (!token) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     await redisClient.del(`auth_${token}`);
-    res.status(204).send();
+    return res.status(204).send();
   }
 }
 

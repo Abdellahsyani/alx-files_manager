@@ -1,10 +1,7 @@
 import { createHash } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { redisClient } from '../utils/redis';
-
-const users = [
-  { email: 'test@example.com', passwordHash: createHash('sha1').update('password123').digest('hex'), _id: '1' },
-];
+import dbClient from '../utils/db'; // Correctly import the MongoDB client
 
 export default class AuthController {
   static async getConnect(req, res) {
@@ -19,17 +16,29 @@ export default class AuthController {
     const [email, password] = info.split(':');
 
     try {
-      const user = users.find((u) => u.email === email);
-      const hashedPassword = createHash('sha1').update(password).digest('hex');
-      if (!user || hashedPassword !== user.passwordHash) {
+      // Retrieve user from MongoDB
+      const userCollection = await dbClient.userCollection();
+      const user = await userCollection.findOne({ email });
+
+      if (!user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
+      // Hash the password and compare with stored hash
+      const hashedPassword = createHash('sha1').update(password).digest('hex');
+
+      if (hashedPassword !== user.password) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      // Generate the token and save in Redis
       const token = uuidv4();
-      await redisClient.set(`auth_${token}`, user._id.toString(), 'EX', 24 * 60 * 60);
+      await redisClient.setex(`auth_${token}`, 24 * 60 * 60, user._id.toString());
+     // await redisClient.set(`auth_${token}`, user._id.toString(), 'EX', 24 * 60 * 60); // Expire in 24 hours
 
       return res.status(200).json({ token });
     } catch (error) {
+      console.error(error); // Log the error for debugging
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }

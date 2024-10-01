@@ -20,7 +20,7 @@ export default class AuthController {
 
     try {
       const user = users.find((u) => u.email === email);
-      const hashedPassword = createHash('shal').update(password).digest('hex');
+      const hashedPassword = createHash('sha1').update(password).digest('hex');
       if (!user || hashedPassword !== user.passwordHash) {
         return res.status(401).json({ error: 'Unauthorized' });
       }

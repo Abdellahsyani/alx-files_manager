@@ -1,15 +1,15 @@
 import sha1 from 'sha1';
 import Queue from 'bull/lib/queue';
+import { ObjectId } from 'mongodb';
 import dbClient from '../utils/db';
 import { redisClient } from '../utils/redis';
-import { ObjectId } from 'mongodb';
 
 const userQueue = new Queue('email sending');
 
 export default class UsersController {
   static async postNew(req, res) {
-    const email = req.body?.email;
-    const password = req.body?.password;
+    const email = req.body && req.body.email;
+    const password = req.body && req.body.password;
 
     if (!email) {
       return res.status(400).json({ error: 'Missing email' });

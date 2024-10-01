@@ -33,8 +33,8 @@ export default class AuthController {
 
       // Generate the token and save in Redis
       const token = uuidv4();
-      await redisClient.setex(`auth_${token}`, 24 * 60 * 60, user._id.toString());
-     // await redisClient.set(`auth_${token}`, user._id.toString(), 'EX', 24 * 60 * 60); // Expire in 24 hours
+      // await redisClient.set(`auth_${token}`, 24 * 60 * 60, user._id.toString());
+      await redisClient.set(`auth_${token}`, user._id.toString(), 24 * 60 * 60); // Expire in 24 hours
 
       return res.status(200).json({ token });
     } catch (error) {

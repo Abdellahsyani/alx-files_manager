@@ -1,93 +1,71 @@
-import { tmpdir } from 'os';
-import { promisify } from 'util';
-import Queue from 'bull/lib/queue';
-import { v4 as uuidv4 } from 'uuid';
-import { join as joinPath } from 'path';
-import { Request, Response } from 'express';
-import { contentType } from 'mime-types';
-import mongoDBCore from 'mongodb/lib/core';
+import { ObjectId } from 'mongodb';
+import fs from 'fs';
+import path from 'path';
 import dbClient from '../utils/db';
-
-const VALID_FILE_TYPES = {
-  folder: 'folder',
-  file: 'file',
-  image: 'image',
-};
+import { redisClient } from '../utils/redis';
+import { v4 as uuidv4 } from 'uuid';
 
 export default class FilesController {
   static async postUpload(req, res) {
-    const { user } = req;
-    const name = req.body ? req.body.name : null;
-    const type = req.body ? req.body.type : null;
-    const parentId = req.body && req.body.parentId ? req.body.parentId : ROOT_FOLDER_ID;
-    const isPublic = req.body && req.body.isPublic ? req.body.isPublic : false;
-    const base64Data = req.body && req.body.data ? req.body.data : '';
+    const token = req.headers['x-token'];
+    const { name, type, parentId, isPublic = false, data } = req.body;
+
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     if (!name) {
-      res.status(400).json({ error: 'Missing name' });
-      return;
+      return res.status(400).json({ error: 'Missing name' });
     }
-    if (!type || !Object.values(VALID_FILE_TYPES).includes(type)) {
-      res.status(400).json({ error: 'Missing type' });
-      return;
-    }
-    if (!req.body.data && type !== VALID_FILE_TYPES.folder) {
-      res.status(400).json({ error: 'Missing data' });
-      return;
-    }
-    if ((parentId !== ROOT_FOLDER_ID) && (parentId !== ROOT_FOLDER_ID.toString())) {
-      const file = await (await dbClient.filesCollection())
-        .findOne({
-          _id: new mongoDBCore.BSON.ObjectId(isValidId(parentId) ? parentId : NULL_ID),
-        });
 
-      if (!file) {
-        res.status(400).json({ error: 'Parent not found' });
-        return;
+    if (!type || !['folder', 'file', 'image'].includes(type)) {
+      return res.status(400).json({ error: 'Missing type' });
+    }
+
+    if (type !== 'folder' && !data) {
+      return res.status(400).json({ error: 'Missing data' });
+    }
+
+    if (parentId) {
+      const parentFile = await (await dbClient.userCollection()).findOne({ _id: ObjectId(parentId) });
+      if (!parentFile) {
+        return res.status(400).json({ error: 'Parent not found' });
       }
-      if (file.type !== VALID_FILE_TYPES.folder) {
-        res.status(400).json({ error: 'Parent is not a folder' });
-        return;
+      if (parentFile.type !== 'folder') {
+        return res.status(400).json({ error: 'Parent is not a folder' });
       }
     }
-    const userId = user._id.toString();
-    const baseDir = `${process.env.FOLDER_PATH || ''}`.trim().length > 0
-      ? process.env.FOLDER_PATH.trim()
-      : joinPath(tmpdir(), DEFAULT_ROOT_FOLDER);
-    // default baseDir == '/tmp/files_manager'
-    // or (on Windows) '%USERPROFILE%/AppData/Local/Temp/files_manager';
-    const newFile = {
-      userId: new mongoDBCore.BSON.ObjectId(userId),
+
+    const fileDocument = {
+      userId: ObjectId(userId),
       name,
       type,
       isPublic,
-      parentId: (parentId === ROOT_FOLDER_ID) || (parentId === ROOT_FOLDER_ID.toString())
-        ? '0'
-        : new mongoDBCore.BSON.ObjectId(parentId),
+      parentId: parentId ? ObjectId(parentId) : 0,
     };
-    await mkDirAsync(baseDir, { recursive: true });
-    if (type !== VALID_FILE_TYPES.folder) {
-      const localPath = joinPath(baseDir, uuidv4());
-      await writeFileAsync(localPath, Buffer.from(base64Data, 'base64'));
-      newFile.localPath = localPath;
+
+    if (type === 'folder') {
+      const newFile = await (await dbClient.userCollection()).insertOne(fileDocument);
+      return res.status(201).json({ id: newFile.insertedId, ...fileDocument });
     }
-    const insertionInfo = await (await dbClient.filesCollection())
-      .insertOne(newFile);
-    const fileId = insertionInfo.insertedId.toString();
-    // start thumbnail generation worker
-    if (type === VALID_FILE_TYPES.image) {
-      const jobName = `Image thumbnail [${userId}-${fileId}]`;
-      fileQueue.add({ userId, fileId, name: jobName });
-    }
-    res.status(201).json({
-      id: fileId,
-      userId,
-      name,
-      type,
-      isPublic,
-      parentId: (parentId === ROOT_FOLDER_ID) || (parentId === ROOT_FOLDER_ID.toString())
-        ? 0
-        : parentId,
-    });
+
+    // Handle file/image types
+    const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
+    const absolutePath = path.join(folderPath, `${uuidv4()}`);
+    
+    fs.mkdirSync(folderPath, { recursive: true });
+    fs.writeFileSync(absolutePath, Buffer.from(data, 'base64'));
+
+    fileDocument.localPath = absolutePath;
+
+    const newFile = await (await dbClient.userCollection()).insertOne(fileDocument);
+    return res.status(201).json({ id: newFile.insertedId, ...fileDocument });
   }
 }
+
+module.exports = FilesController;

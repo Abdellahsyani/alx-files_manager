@@ -32,7 +32,7 @@ export default class FilesController {
     }
 
     if (parentId) {
-      const parentFile = await (await dbClient.userCollection()).findOne({ _id: ObjectId(parentId) });
+      const parentFile = await (await dbClient.filesCollection()).findOne({ _id: ObjectId(parentId) });
       if (!parentFile) {
         return res.status(400).json({ error: 'Parent not found' });
       }
@@ -50,20 +50,20 @@ export default class FilesController {
     };
 
     if (type === 'folder') {
-      const newFile = await (await dbClient.userCollection()).insertOne(fileDocument);
+      const newFile = await (await dbClient.filesCollection()).insertOne(fileDocument);
       return res.status(201).json({ id: newFile.insertedId, ...fileDocument });
     }
 
     // Handle file/image types
     const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
     const absolutePath = path.join(folderPath, `${uuidv4()}`);
-    
+
     fs.mkdirSync(folderPath, { recursive: true });
     fs.writeFileSync(absolutePath, Buffer.from(data, 'base64'));
 
     fileDocument.localPath = absolutePath;
 
-    const newFile = await (await dbClient.userCollection()).insertOne(fileDocument);
+    const newFile = await (await dbClient.filesCollection()).insertOne(fileDocument);
     return res.status(201).json({ id: newFile.insertedId, ...fileDocument });
   }
 }
